@@ -1,0 +1,3 @@
+virtualenv/
+dist/
+src/sentrev.egg-info/

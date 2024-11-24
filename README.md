@@ -4,7 +4,7 @@
 </div>
 <br>
 <div align="center">
-    <img src="logo.png" alt="Streamlit Logo">
+    <img src="https://raw.githubusercontent.com/AstraBert/SenTrEv/main/logo.png" alt="SenTrEv Logo">
 </div>
 
 **SenTrEv** (**Sen**tence **Tr**ansformers **Ev**aluator) is a python package that is aimed at running simple evaluation tests to help you choose the best embedding model for Retrieval Augmented Generation (RAG) with your PDF documents.
@@ -69,7 +69,7 @@ We can do it with this very simple code:
 
 ```python
 from sentrev.evaluator import evaluate_rag
-from sentence_transformers import Sentence transformer
+from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 
 # load all the embedding moedels
@@ -92,10 +92,10 @@ pdfs = ['~/pdfs/instructions.pdf', '~/pdfs/history.pdf', '~/pdfs/info.pdf']
 csv_path = '~/eval/stats.csv'
 
 # evaluate retrieval
-evaluate_rag(pdfs=pdfs, encoders=encoders, client=client, csv_path=csv_path)
+evaluate_rag(pdfs=pdfs, encoders=encoders, encoder_to_name=encoder_to_names, client=client, csv_path=csv_path, distance='euclid', chunking_size=400, plot=True)
 ```
  
-You can play around with the chunking of your PDF by setting the `chunking_size` argument or with the percentage of text used to test retrieval by setting `text_percentage`, or with the distance metric used for retrieval by setting the `distance` argument; you can also pass `plot=True` if you want also plots for the evaluation: plots will be saved under the same folder of the CSV file.
+You can play around with the chunking of your PDF by setting the `chunking_size` argument or with the percentage of text used to test retrieval by setting `text_percentage`, or with the distance metric used for retrieval by setting the `distance` argument; you can also pass `plot=True` if you want plots for the evaluation: plots will be saved under the same folder of the CSV file.
 
 #### 2. On-cloud Qdrant
 
@@ -165,6 +165,8 @@ Find contribution guidelines at [CONTRIBUTING.md](https://github.com/AstraBert/S
 This project is open-source and is provided under an [MIT License](https://github.com/AstraBert/SenTrEv/tree/main/LICENSE).
 
 If you used `SenTrEv` to evaluate your retrieval models, please consider citing it:
+
+> _Bertelli, A. C. (2024). SenTrEv - Simple customizable evaluation for text retrieval performance of Sentence Transformers embedders on PDFs (v0.0.0). Zenodo. https://doi.org/10.5281/zenodo.14212650_
 
 If you found it useful, please consider [funding it](https://github.com/sponsors/AstraBert) .
 

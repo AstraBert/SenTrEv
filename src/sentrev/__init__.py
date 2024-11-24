@@ -1,1 +1,1 @@
-from evaluator import evaluate_rag
+from .evaluator import evaluate_rag
