@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentrev"
+version = "0.0.0"
+authors = [
+    { name="A. Clelia Bertelli", email="astraberte9@gmail.com" },
+]
+description = "Simple customizable evaluation for RAG performance of Sentence Transformers Models on PDFs"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'sentence_transformers == 3.0.1',
+    'qdrant_client == 1.10.1',
+    'pypdf == 4.3.1',
+    'langchain == 0.2.10',
+    'langchain_core == 0.2.24',
+    'langchain_community == 0.2.11',
+    'langchain_text_splitters == 0.2.2',
+    'matplotlib',
+    'pandas'
+]
+
+[project.urls]
+Homepage = "https://github.com/AstraBert/sentrev"
+Issues = "https://github.com/AstraBert/sentrev/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sentrev*"]  # Add this line
+
+[options.package_data]
+sentrev = ["*"]
