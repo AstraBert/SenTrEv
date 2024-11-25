@@ -154,6 +154,17 @@ page = res[0]["page"]
 
 Find a reference for all the functions and classes [here](https://github.com/AstraBert/SenTrEv/tree/main/REFERENCE.md)
 
+### Roadmap
+
+#### v0.1.0
+- [ ] Add carbon emissions evaluation
+- [ ] Add Mean Reciprocal Rank (an information retrieval metric that considers how high in a ranked list the retriever can place the correct item)
+
+#### v1.0.0
+
+- [ ] Add support for Markdown, HTML, Word and CSV data types
+- [ ] Add support for Chroma, Pinecone, Weaviate, Supabase and MongoDB as vector databases
+
 
 ### Contributing
 
