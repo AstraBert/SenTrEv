@@ -60,6 +60,8 @@ def evaluate_rag(
     chunking_size: int = 1000,
     text_percentage: float = 0.25,
     distance: str = 'cosine',
+    mrr: int = 1,
+    carbon_tracking: bool = False,
     plot: bool = False,
 ):
     """
@@ -106,7 +108,7 @@ def evaluate_rag(
         "success_rate": [],
     }
     for encoder in encoders:
-        data, collection_name = upload_pdfs(pdfs, encoder, client, chunking_size)
+        data, collection_name = upload_pdfs(pdfs, encoder, client, chunking_size, distance)
         texts = [d["text"] for d in data]
         reduced_texts = {}
         for t in texts:
@@ -116,21 +118,41 @@ def evaluate_rag(
         times = []
         success = 0
         searcher = NeuralSearcher(collection_name, client, encoder)
-        for rt in reduced_texts:
-            strt = time.time()
-            res = searcher.search(rt)
-            end = time.time()
-            times.append(end - strt)
-            if res[0]["text"] == reduced_texts[rt]:
-                success += 1
-            else:
-                continue
+        if mrr <= 1:
+            for rt in reduced_texts:
+                strt = time.time()
+                res = searcher.search(rt)
+                end = time.time()
+                times.append(end - strt)
+                if res[0]["text"] == reduced_texts[rt]:
+                    success += 1
+                else:
+                    continue
+        else:
+            ranking_mean = 0
+            for rt in reduced_texts:
+                strt = time.time()
+                res = searcher.search(rt, limit=mrr)
+                end = time.time()
+                times.append(end - strt)
+                if res[0]["text"] == reduced_texts[rt]:
+                    success += 1
+                    ranking_mean += 1
+                else:
+                    for i in range(len(res)):
+                        if res[i]["text"] == reduced_texts[rt]:
+                            ranking_mean += (mrr-i-1)/mrr
+                        else:
+                            continue
         times_stats = [mean(times), stdev(times)]
         success_rate = success / len(reduced_texts)
         performances["encoder"].append(encoder_to_name[encoder])
         performances["average_time"].append(times_stats[0])
         performances["stdev_time"].append(times_stats[1])
         performances["success_rate"].append(success_rate)
+        if mrr > 1:
+            rank_m = ranking_mean / len(reduced_texts)
+            performances["mean_reciprocal_ranking"].append(rank_m)
         client.delete_collection(collection_name)
     performances_df = pd.DataFrame.from_dict(performances)
     performances_df.to_csv(csv_path, index=False)
