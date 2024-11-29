@@ -6,6 +6,7 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 import os
 
+
 def remove_items(test_list: list, item):
     """
     Remove all occurrences of a specific item from a list.
@@ -20,6 +21,7 @@ def remove_items(test_list: list, item):
     res = [i for i in test_list if i != item]
     return res
 
+
 def merge_pdfs(pdfs: list):
     """
     Merge multiple PDF files into a single PDF document.
@@ -28,7 +30,7 @@ def merge_pdfs(pdfs: list):
         pdfs (list): List of paths to PDF files to merge
 
     Returns:
-        str: Path to the merged PDF file. The filename is derived from the last PDF 
+        str: Path to the merged PDF file. The filename is derived from the last PDF
              in the input list with '_results' appended before the extension
     """
     merger = PdfMerger()
@@ -37,6 +39,7 @@ def merge_pdfs(pdfs: list):
     merger.write(f"{pdfs[-1].split('.')[0]}_results.pdf")
     merger.close()
     return f"{pdfs[-1].split('.')[0]}_results.pdf"
+
 
 class NeuralSearcher:
     """
@@ -50,13 +53,14 @@ class NeuralSearcher:
         client (QdrantClient): Initialized Qdrant client for database operations
         model (SentenceTransformer): Model for encoding text into vectors
     """
+
     def __init__(self, collection_name, client, model):
         self.collection_name = collection_name
         # Initialize encoder model
         self.model = model
         # initialize Qdrant client
         self.qdrant_client = client
-    
+
     def search(self, text: str, limit: int = 1):
         """
         Perform a neural search for the given text query.
@@ -71,7 +75,7 @@ class NeuralSearcher:
         """
         # Convert text query into vector
         vector = self.model.encode(text).tolist()
-        
+
         # Use `vector` for search for closest vectors in the collection
         search_result = self.qdrant_client.search(
             collection_name=self.collection_name,
@@ -81,6 +85,7 @@ class NeuralSearcher:
         )
         payloads = [hit.payload for hit in search_result]
         return payloads
+
 
 class PDFdatabase:
     """
@@ -96,12 +101,20 @@ class PDFdatabase:
         chunking_size (int, optional): Size of text chunks for processing. Defaults to 1000
         distance (str, optional): Distance metric for vector similarity. Must be one of: 'cosine', 'dot', 'euclid', 'manhattan'. Defaults to 'cosine'
     """
-    def __init__(self, pdfs: list, encoder: SentenceTransformer, client: QdrantClient, chunking_size=1000, distance: str ='cosine'):
+
+    def __init__(
+        self,
+        pdfs: list,
+        encoder: SentenceTransformer,
+        client: QdrantClient,
+        chunking_size=1000,
+        distance: str = "cosine",
+    ):
         distance_dict = {
-            "cosine": models.Distance.COSINE, 
-            "dot": models.Distance.DOT, 
-            "euclid": models.Distance.EUCLID, 
-            "manhattan": models.Distance.MANHATTAN
+            "cosine": models.Distance.COSINE,
+            "dot": models.Distance.DOT,
+            "euclid": models.Distance.EUCLID,
+            "manhattan": models.Distance.MANHATTAN,
         }
         self.finalpdf = merge_pdfs(pdfs)
         self.collection_name = os.path.basename(self.finalpdf).split(".")[0].lower()
@@ -109,7 +122,7 @@ class PDFdatabase:
         self.client = client
         self.chunking_size = chunking_size
         self.distance = distance_dict[distance]
-    
+
     def preprocess(self):
         """
         Preprocess the merged PDF document by loading and splitting it into chunks.
@@ -124,7 +137,7 @@ class PDFdatabase:
             chunk_size=self.chunking_size, chunk_overlap=0
         )
         self.pages = text_splitter.split_documents(documents)
-    
+
     def collect_data(self):
         """
         Process the chunked documents into a structured format.
@@ -149,7 +162,7 @@ class PDFdatabase:
                     }
                 )
         return self.documents
-    
+
     def qdrant_collection_and_upload(self):
         """
         Create a Qdrant collection and upload the processed documents.

@@ -6,22 +6,18 @@ import pandas as pd
 import random as r
 import time
 from math import floor
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from statistics import mean, stdev
+from codecarbon import OfflineEmissionsTracker
 
 plt.style.use("seaborn-v0_8-paper")
-
-
-from typing import List, Tuple
-from sentence_transformers import SentenceTransformer
-from qdrant_client import QdrantClient
 
 def upload_pdfs(
     pdfs: List[str],
     encoder: SentenceTransformer,
     client: QdrantClient,
     chunking_size: int = 1000,
-    distance: str = 'cosine'
+    distance: str = "cosine",
 ) -> Tuple[list, str]:
     """
     Process and upload multiple PDF documents to a Qdrant vector database.
@@ -59,106 +55,181 @@ def evaluate_rag(
     csv_path: str,
     chunking_size: int = 1000,
     text_percentage: float = 0.25,
-    distance: str = 'cosine',
+    distance: str = "cosine",
     mrr: int = 1,
-    carbon_tracking: bool = False,
+    carbon_tracking: str = "",
     plot: bool = False,
 ):
     """
-    Evaluates the performance of retrieval-augmented generation (RAG) using various sentence encoders.
+    Comprehensively evaluates Retrieval-Augmented Generation (RAG) performance across multiple dimensions.
 
-    This function uploads PDFs to a Qdrant vector database, conducts retrieval tests using the provided encoders,
-    and computes the performance metrics including average retrieval time, standard deviation of time, and success rate.
-    Optionally, it generates bar plots to visualize the results.
+    Extends traditional RAG evaluation by incorporating advanced metrics and optional carbon emission tracking.
 
     Parameters:
-    - pdfs (List[str]): List of file paths to the PDF documents to be uploaded and processed.
-    - encoders (List[SentenceTransformer]): List of sentence transformer models used for encoding text.
-    - encoder_to_name (Dict[SentenceTransformer, str]): Mapping of encoder models to their display names for results.
-    - client (QdrantClient): Client instance for interacting with the Qdrant vector database.
-    - csv_path (str): Path to save the CSV file containing performance metrics.
-    - chunking_size (int, optional): Number of characters per chunk for splitting PDF text. Default is 1000.
-    - text_percentage (float, optional): Fraction of each text chunk to be used for retrieval. Default is 0.25.
-    - distance (str, optional): Distance metric for vector similarity. Must be one of: 'cosine', 'dot', 'euclid', 'manhattan'. Defaults to 'cosine'
-    - plot (bool, optional): If True, generates and saves bar plots for average retrieval time and success rate. Default is False.
+    - pdfs (List[str]): PDF document paths to process and evaluate.
+    - encoders (List[SentenceTransformer]): Sentence transformer models for text encoding.
+    - encoder_to_name (Dict[SentenceTransformer, str]): Mapping of encoder models to display names.
+    - client (QdrantClient): Qdrant vector database client.
+    - csv_path (str): Path for saving performance metrics CSV.
+    - chunking_size (int, optional): Text chunk size in characters. Default is 1000.
+    - text_percentage (float, optional): Fraction of text chunk used for retrieval. Default is 0.25.
+    - distance (str, optional): Vector similarity metric. Options: 'cosine', 'dot', 'euclid', 'manhattan'. Defaults to 'cosine'.
+    - mrr (int, optional): Mean Reciprocal Rank evaluation depth. Default is 1 (top result only).
+    - carbon_tracking (str, optional): ISO country code for carbon emissions tracking. Empty string disables tracking.
+    - plot (bool, optional): Generate performance visualization plots. Default is False.
+
+    Performance Metrics:
+    - Average Retrieval Time: Mean query retrieval duration.
+    - Retrieval Time Standard Deviation: Time variability across queries.
+    - Success Rate: Fraction of queries retrieving correct results.
+    - Mean Reciprocal Rank (MRR): Ranking performance metric for top-k retrievals.
+    - Carbon Emissions (optional): CO2 equivalent emissions during retrieval.
+
+    Visualization Options:
+    Generates PNG plots for:
+    - Retrieval Time
+    - Success Rate
+    - Mean Reciprocal Rank (if mrr > 1)
+    - Carbon Emissions (if carbon tracking enabled)
+
+    Side Effects:
+    - Uploads data to Qdrant database
+    - Deletes Qdrant collections post-evaluation
+    - Saves performance metrics to CSV
+    - Optionally saves performance visualization plots
 
     Returns:
     None
-
-    Side Effects:
-    - Uploads data to the Qdrant database.
-    - Deletes Qdrant collections after evaluation.
-    - Saves performance metrics to a CSV file.
-    - Optionally, saves bar plots to PNG files.
-
-    Performance Metrics:
-    - Average Retrieval Time: Mean time taken for retrieval queries.
-    - Standard Deviation of Retrieval Time: Variability in retrieval time across queries.
-    - Success Rate: Fraction of queries that retrieved the correct result.
-
-    Visualization:
-    - Generates two bar plots:
-        1. Average Retrieval Time (with error bars for standard deviation).
-        2. Retrieval Success Rate (with success rates normalized between 0 and 1).
     """
     performances = {
         "encoder": [],
         "average_time": [],
         "stdev_time": [],
         "success_rate": [],
+        "average_mrr": [],
+        "stdev_mrr": [],
+        "carbon_emissions(g_CO2eq)": [],
     }
-    for encoder in encoders:
-        data, collection_name = upload_pdfs(pdfs, encoder, client, chunking_size, distance)
-        texts = [d["text"] for d in data]
-        reduced_texts = {}
-        for t in texts:
-            perc = floor(len(t) * text_percentage)
-            start = r.randint(0, len(t) - perc)
-            reduced_texts.update({t[start : perc + start]: t})
-        times = []
-        success = 0
-        searcher = NeuralSearcher(collection_name, client, encoder)
-        if mrr <= 1:
-            for rt in reduced_texts:
-                strt = time.time()
-                res = searcher.search(rt)
-                end = time.time()
-                times.append(end - strt)
-                if res[0]["text"] == reduced_texts[rt]:
-                    success += 1
-                else:
-                    continue
-        else:
-            ranking_mean = 0
-            for rt in reduced_texts:
-                strt = time.time()
-                res = searcher.search(rt, limit=mrr)
-                end = time.time()
-                times.append(end - strt)
-                if res[0]["text"] == reduced_texts[rt]:
-                    success += 1
-                    ranking_mean += 1
-                else:
-                    for i in range(len(res)):
-                        if res[i]["text"] == reduced_texts[rt]:
-                            ranking_mean += (mrr-i-1)/mrr
-                        else:
-                            continue
-        times_stats = [mean(times), stdev(times)]
-        success_rate = success / len(reduced_texts)
-        performances["encoder"].append(encoder_to_name[encoder])
-        performances["average_time"].append(times_stats[0])
-        performances["stdev_time"].append(times_stats[1])
-        performances["success_rate"].append(success_rate)
-        if mrr > 1:
-            rank_m = ranking_mean / len(reduced_texts)
-            performances["mean_reciprocal_ranking"].append(rank_m)
-        client.delete_collection(collection_name)
+    if not carbon_tracking:
+        for encoder in encoders:
+            data, collection_name = upload_pdfs(
+                pdfs, encoder, client, chunking_size, distance
+            )
+            texts = [d["text"] for d in data]
+            reduced_texts = {}
+            for t in texts:
+                perc = floor(len(t) * text_percentage)
+                start = r.randint(0, len(t) - perc)
+                reduced_texts.update({t[start : perc + start]: t})
+            times = []
+            success = 0
+            searcher = NeuralSearcher(collection_name, client, encoder)
+            if mrr <= 1:
+                for rt in reduced_texts:
+                    strt = time.time()
+                    res = searcher.search(rt)
+                    end = time.time()
+                    times.append(end - strt)
+                    if res[0]["text"] == reduced_texts[rt]:
+                        success += 1
+                    else:
+                        continue
+            else:
+                ranking_mean = []
+                for rt in reduced_texts:
+                    strt = time.time()
+                    res = searcher.search(rt, limit=mrr)
+                    end = time.time()
+                    times.append(end - strt)
+                    if res[0]["text"] == reduced_texts[rt]:
+                        success += 1
+                        ranking_mean.append(1)
+                    else:
+                        for i in range(len(res)):
+                            if res[i]["text"] == reduced_texts[rt]:
+                                ranking_mean.append((mrr - i - 1) / mrr)
+                            else:
+                                continue
+            times_stats = [mean(times), stdev(times)]
+            success_rate = success / len(reduced_texts)
+            performances["encoder"].append(encoder_to_name[encoder])
+            performances["average_time"].append(times_stats[0])
+            performances["stdev_time"].append(times_stats[1])
+            performances["success_rate"].append(success_rate)
+            if mrr > 1:
+                mrr_stats = [mean(ranking_mean), stdev(ranking_mean)]
+                performances["average_mrr"].append(mrr_stats[0])
+                performances["stdev_mrr"].append(mrr_stats[1])
+            else:
+                performances["average_mrr"].append("NA")
+                performances["stdev_mrr"].append("NA")
+            performances["carbon_emissions(g_CO2eq)"].append("NA")
+            client.delete_collection(collection_name)
+    else:
+        tracker = OfflineEmissionsTracker(country_iso_code=carbon_tracking)
+        for encoder in encoders:
+            tracker.start()
+            data, collection_name = upload_pdfs(
+                pdfs, encoder, client, chunking_size, distance
+            )
+            texts = [d["text"] for d in data]
+            reduced_texts = {}
+            for t in texts:
+                perc = floor(len(t) * text_percentage)
+                start = r.randint(0, len(t) - perc)
+                reduced_texts.update({t[start : perc + start]: t})
+            times = []
+            success = 0
+            searcher = NeuralSearcher(collection_name, client, encoder)
+            if mrr <= 1:
+                for rt in reduced_texts:
+                    strt = time.time()
+                    res = searcher.search(rt)
+                    end = time.time()
+                    times.append(end - strt)
+                    if res[0]["text"] == reduced_texts[rt]:
+                        success += 1
+                    else:
+                        continue
+            else:
+                ranking_mean = []
+                for rt in reduced_texts:
+                    strt = time.time()
+                    res = searcher.search(rt, limit=mrr)
+                    end = time.time()
+                    times.append(end - strt)
+                    if res[0]["text"] == reduced_texts[rt]:
+                        success += 1
+                        ranking_mean.append(1)
+                    else:
+                        for i in range(len(res)):
+                            if res[i]["text"] == reduced_texts[rt]:
+                                ranking_mean.append((mrr - i - 1) / mrr)
+                            else:
+                                continue
+            emissions = tracker.stop()
+            times_stats = [mean(times), stdev(times)]
+            success_rate = success / len(reduced_texts)
+            performances["encoder"].append(encoder_to_name[encoder])
+            performances["average_time"].append(times_stats[0])
+            performances["stdev_time"].append(times_stats[1])
+            performances["success_rate"].append(success_rate)
+            if mrr > 1:
+                mrr_stats = [mean(ranking_mean), stdev(ranking_mean)]
+                performances["average_mrr"].append(mrr_stats[0])
+                performances["stdev_mrr"].append(mrr_stats[1])
+            else:
+                performances["average_mrr"].append("NA")
+                performances["stdev_mrr"].append("NA")
+            performances["carbon_emissions(g_CO2eq)"].append(emissions * 1000)
+            client.delete_collection(collection_name)
     performances_df = pd.DataFrame.from_dict(performances)
     performances_df.to_csv(csv_path, index=False)
     if plot:
         path_time = csv_path.split(".")[0] + "_times.png"
         path_sr = csv_path.split(".")[0] + "_success_rate.png"
+        path_mrr = csv_path.split(".")[0] + "_mrr.png"
+        path_co2 = csv_path.split(".")[0] + "_co2.png"
 
         X = performances["encoder"]
         y_times = performances["average_time"]
@@ -195,3 +266,39 @@ def evaluate_rag(
             )
 
         fig_sr.savefig(path_sr)
+
+        if mrr > 1:
+            y_mrr = performances["average_mrr"]
+            yerr_mrr = performances["stdev_mrr"]
+            fig_mrr, ax_mrr = plt.subplots(figsize=(10, 5))
+            bars_mrr = ax_mrr.bar(X, y_mrr, color=colors, yerr=yerr_mrr)
+            ax_mrr.set_title(f"Mean Reciprocal Ranking @ {mrr}")
+            ax_mrr.set_ylim(0, 1)
+            for bar in bars_mrr:
+                height = bar.get_height()
+                ax_mrr.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    height,
+                    f"{height:.2f}",
+                    ha="left",
+                    va="bottom",
+                )
+
+            fig_mrr.savefig(path_mrr)
+        if carbon_tracking:
+            y_co2 = performances["carbon_emissions(g_CO2eq)"]
+            fig_co2, ax_co2 = plt.subplots(figsize=(10, 5))
+            bars_co2 = ax_co2.bar(X, y_co2, color=colors)
+            ax_co2.set_title("Carbon Emissions")
+            ax_co2.set_ylabel("CO2 emissions (g of CO2eq)")
+            for bar in bars_co2:
+                height = bar.get_height()
+                ax_co2.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    height,
+                    f"{height:.2f}",
+                    ha="left",
+                    va="bottom",
+                )
+
+            fig_co2.savefig(path_co2)
