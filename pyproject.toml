@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sentrev"
-version = "0.0.0.post2"
+version = "0.1.0"
 authors = [
     { name="A. Clelia Bertelli", email="astraberte9@gmail.com" },
 ]
@@ -25,6 +25,7 @@ dependencies = [
     'langchain_community',
     'langchain_text_splitters',
     'matplotlib',
+    'codecarbon',
     'pandas'
 ]
 

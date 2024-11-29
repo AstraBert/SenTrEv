@@ -12,6 +12,7 @@ import time
 from math import floor
 from typing import List, Dict, Tuple
 from statistics import mean, stdev
+from codecarbon import OfflineEmissionsTracker
 
 plt.style.use("seaborn-v0_8-paper")
 ```
@@ -52,140 +53,47 @@ def upload_pdfs(
 ## `evaluate_rag` Function
 
 ### Description
-Evaluates the performance of retrieval-augmented generation (RAG) using various sentence encoders. It uploads PDFs to a Qdrant database, conducts retrieval tests, and computes performance metrics such as retrieval time and success rate. Optionally generates bar plots for visualization.
+Evaluates Retrieval-Augmented Generation (RAG) performance using sentence encoders. Uploads PDFs to a Qdrant database, conducts retrieval tests, and computes comprehensive performance metrics. Supports optional Mean Reciprocal Rank (MRR) evaluation and carbon emissions tracking.
 
 ### Parameters
-- `pdfs (List[str])`: List of file paths to the PDF documents to process.
-- `encoders (List[SentenceTransformer])`: List of sentence transformer models for encoding text.
-- `encoder_to_name (Dict[SentenceTransformer, str])`: Mapping of encoder models to display names for results.
+- `pdfs (List[str])`: PDF document paths to process.
+- `encoders (List[SentenceTransformer])`: Sentence transformer models for text encoding.
+- `encoder_to_name (Dict[SentenceTransformer, str])`: Mapping of encoder models to display names.
 - `client (QdrantClient)`: Qdrant client for database interactions.
-- `csv_path (str)`: Path to save the CSV file with performance metrics.
-- `chunking_size (int, optional)`: Number of characters per chunk for splitting PDF text. Default is 1000.
-- `text_percentage (float, optional)`: Fraction of each text chunk used for retrieval. Default is 0.25.
-- `distance (str, optional)`: Distance metric for vector similarity. Options: `"cosine"`, `"dot"`, `"euclid"`, `"manhattan"`. Default is `"cosine"`.
-- `plot (bool, optional)`: If `True`, generates and saves bar plots. Default is `False`.
+- `csv_path (str)`: Path to save performance metrics CSV.
+- `chunking_size (int, optional)`: Characters per PDF text chunk. Default is 1000.
+- `text_percentage (float, optional)`: Text chunk fraction for retrieval. Default is 0.25.
+- `distance (str, optional)`: Vector similarity metric. Options: `"cosine"`, `"dot"`, `"euclid"`, `"manhattan"`. Default is `"cosine"`.
+- `mrr (int, optional)`: Mean Reciprocal Rank evaluation depth. Default is 1.
+- `carbon_tracking (str, optional)`: ISO country code for carbon emissions tracking.
+- `plot (bool, optional)`: Generate performance visualization plots. Default is `False`.
 
 ### Returns
 None.
 
 ### Side Effects
-- Uploads data to the Qdrant database.
+- Uploads data to Qdrant database.
 - Deletes Qdrant collections after evaluation.
-- Saves performance metrics to a CSV file.
-- Optionally saves bar plots as PNG files.
+- Saves performance metrics to CSV.
+- Optionally generates visualization plots.
 
 ### Metrics
-- **Average Retrieval Time**: Mean time for retrieval queries.
-- **Standard Deviation of Retrieval Time**: Variability of retrieval time.
-- **Success Rate**: Fraction of correct retrievals.
+- Average Retrieval Time
+- Retrieval Time Standard Deviation
+- Success Rate
+- Mean Reciprocal Rank (optional)
+- Carbon Emissions (optional)
 
 ### Visualization
 Generates bar plots for:
-1. Average Retrieval Time (with error bars for standard deviation).
-2. Retrieval Success Rate (normalized between 0 and 1).
+1. Average Retrieval Time
+2. Retrieval Success Rate
+3. Mean Reciprocal Rank (if enabled)
+4. Carbon Emissions (if tracking enabled)
 
 ### Code
-```python
-def evaluate_rag(
-    pdfs: List[str],
-    encoders: List[SentenceTransformer],
-    encoder_to_name: Dict[SentenceTransformer, str],
-    client: QdrantClient,
-    csv_path: str,
-    chunking_size: int = 1000,
-    text_percentage: float = 0.25,
-    distance: str = 'cosine'
-    plot: bool = False,
-):
-    performances = {
-        "encoder": [],
-        "average_time": [],
-        "stdev_time": [],
-        "success_rate": [],
-    }
+See [the evaluator.py script](./src/sentrev/evaluator.py)
 
-    for encoder in encoders:
-        data, collection_name = upload_pdfs(pdfs, encoder, client, chunking_size)
-        texts = [d["text"] for d in data]
-        reduced_texts = {}
-
-        for t in texts:
-            perc = floor(len(t) * text_percentage)
-            start = r.randint(0, len(t) - perc)
-            reduced_texts.update({t[start : perc + start]: t})
-
-        times = []
-        success = 0
-        searcher = NeuralSearcher(collection_name, client, encoder)
-
-        for rt in reduced_texts:
-            strt = time.time()
-            res = searcher.search(rt)
-            end = time.time()
-            times.append(end - strt)
-            if res[0]["text"] == reduced_texts[rt]:
-                success += 1
-
-        times_stats = [mean(times), stdev(times)]
-        success_rate = success / len(reduced_texts)
-
-        performances["encoder"].append(encoder_to_name[encoder])
-        performances["average_time"].append(times_stats[0])
-        performances["stdev_time"].append(times_stats[1])
-        performances["success_rate"].append(success_rate)
-
-        client.delete_collection(collection_name)
-
-    performances_df = pd.DataFrame.from_dict(performances)
-    performances_df.to_csv(csv_path, index=False)
-
-    if plot:
-        path_time = csv_path.split(".")[0] + "_times.png"
-        path_sr = csv_path.split(".")[0] + "_success_rate.png"
-
-        X = performances["encoder"]
-        y_times = performances["average_time"]
-        yerr_times = performances["stdev_time"]
-        y_successrate = performances["success_rate"]
-
-        colors = [f"#{r.randint(0, 0xFFFFFF):06x}" for _ in X]
-
-        # Plot for average retrieval time
-        fig_times, ax_times = plt.subplots(figsize=(10, 5))
-        bars_times = ax_times.bar(X, y_times, yerr=yerr_times, color=colors)
-        ax_times.set_title("Average Retrieval Time")
-        ax_times.set_ylabel("Time (s)")
-
-        for bar in bars_times:
-            height = bar.get_height()
-            ax_times.text(
-                bar.get_x() + bar.get_width() / 2,
-                height,
-                f"{height:.5f}",
-                ha="left",
-                va="bottom",
-            )
-
-        fig_times.savefig(path_time)
-
-        # Plot for success rate
-        fig_sr, ax_sr = plt.subplots(figsize=(10, 5))
-        bars_sr = ax_sr.bar(X, y_successrate, color=colors)
-        ax_sr.set_title("Retrieval Success Rate")
-        ax_sr.set_ylim(0, 1)
-
-        for bar in bars_sr:
-            height = bar.get_height()
-            ax_sr.text(
-                bar.get_x() + bar.get_width() / 2,
-                height,
-                f"{height:.2f}",
-                ha="center",
-                va="bottom",
-            )
-
-        fig_sr.savefig(path_sr)
-```
 
 # sentrev.utils
 
