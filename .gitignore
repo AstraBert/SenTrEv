@@ -1,3 +1,4 @@
 virtualenv/
 dist/
 src/sentrev.egg-info/
+emissions.csv
