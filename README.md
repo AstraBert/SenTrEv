@@ -40,15 +40,31 @@ python3 -m pip install -e .
 
 ### Evaluation process
 
-The evaluation process is simple:
+SenTrEv applies a very simple evaluation workflow:
 
-- The PDFs are loaded and chunked (the size of the chunks is customizable, but default is 1000) 
-- Each chunk is then vectorized and uploaded to a Qdrant collection
-- For each chunk, a percentage of the text is extracted (the percentage is customizable, but default is 25%) and is mapped to it's original chunk.
-- Each piece of reduced chunk is then vectorized and semantic search with cosine distance (customizable) is performed inside the collection
-- We evaluate the retrieval success rate (a reduced chunk is correctly linked to the original one) by correct/total retrieval attempts.
-- We evaluate the retrieval average time and calculate the standard deviation for it
-- Everything is reported into a CSV and can optionally be displayed with bar plots
+1. After the PDF text extraction and chunking (cfr. _supra_) phase, the chunks are reduced according to a (optionally) user-defined percentage (default is 25%), which is randomly extracted at any point of each chunk.
+2. The reduced chunks are mapped to their original ones in a dictionary
+3. Each model encodes the original chunks and uploads the vectors to the Qdrant vector storage
+4. The reduced chunks are then used as queries for dense retrieval
+5. Starting from retrieval results, accuracy, time and carbon emissions statistics are calculated and plotted.
+
+See the figure below for a visualization of the workflow
+
+![workflow](https://raw.githubusercontent.com/AstraBert/SenTrEv-case-study/main/imgs/SenTrEv_Eval_Workflow.png)
+
+The metrics used to evaluate performance were:
+
+- **Success rate**: defined as the number retrieval operation in which the correct context was retrieved ranking top among all the retrieved contexts, out of the total retrieval operations:
+
+  $SR = \frac{Ncorrect}{Ntot}$ (eq.1)
+
+- **Mean Reciprocal Ranking (MRR)**: MRR defines how high in ranking the correct context is placed among the retrieved results. MRR@10 was used, meaning that for each retrieval operation 10 items were returned and an evaluation was carried out for the ranking of the correct context, which was then normalized between 0 and 1 (already implemented in SenTrEv). An MRR of 1 means that the correct context was ranked first, whereas an MRR of 0 means that it wasn't retrieved. MRR is calculated with the following general equation:
+
+  $MRR = \frac{ranking + Nretrieved - 1}{Nretrieved}$ (eq.2)
+
+  When the correct context is not retrieved, MRR is automatically set to 0. MRR is calculated for each retrieval operation, then the average and standard deviation are calculated and reported.
+- **Time performance**: for each retrieval operation the time performance in seconds is calculated: the average and standard deviation are then reported.
+- **Carbon emissions**: Carbon emissions are calculated in gCO2eq (grams of CO2 equivalent) through the Python library [`codecarbon`](https://codecarbon.io/) and were evaluated for the Austrian region. They are reported for the global computational load of all the retrieval operations.
 
 ### Use cases
 
@@ -57,7 +73,7 @@ The evaluation process is simple:
 You can easily run Qdrant locally with Docker:
 
 ```bash
-docker pull qdrant/Qdrant:latest
+docker pull qdrant/qdrant:latest
 docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant:latest
 ```
 
@@ -92,10 +108,10 @@ pdfs = ['~/pdfs/instructions.pdf', '~/pdfs/history.pdf', '~/pdfs/info.pdf']
 csv_path = '~/eval/stats.csv'
 
 # evaluate retrieval
-evaluate_rag(pdfs=pdfs, encoders=encoders, encoder_to_name=encoder_to_names, client=client, csv_path=csv_path, distance='euclid', chunking_size=400, plot=True)
+evaluate_rag(pdfs=pdfs, encoders=encoders, encoder_to_name=encoder_to_names, client=client, csv_path=csv_path, distance='euclid', chunking_size=400, mrr=10,carbon_tracking="USA", plot=True)
 ```
  
-You can play around with the chunking of your PDF by setting the `chunking_size` argument or with the percentage of text used to test retrieval by setting `text_percentage`, or with the distance metric used for retrieval by setting the `distance` argument; you can also pass `plot=True` if you want plots for the evaluation: plots will be saved under the same folder of the CSV file.
+You can play around with the chunking of your PDF by setting the `chunking_size` argument or with the percentage of text used to test retrieval by setting `text_percentage` or with the distance metric used for retrieval by setting the `distance` argument or with the `mrr` settings by tuning the number of retrieved items (in this case 10); you can also pass `plot=True` if you want plots for the evaluation: plots will be saved under the same folder of the CSV file; if you want to turn on carbon emissions tracking, you can use the `carbon_tracking` option followed by the three-letters ISO code of the State you are in.
 
 #### 2. On-cloud Qdrant
 
@@ -150,15 +166,15 @@ source = res[0]["source"]
 page = res[0]["page"]
 ```
 
+### Case Study
+
+You can refer to the test case reported [here](https://github.com/AstraBert/SenTrEv/tree/main/CaseStudy.pdf)
+
 ### Reference
 
 Find a reference for all the functions and classes [here](https://github.com/AstraBert/SenTrEv/tree/main/REFERENCE.md)
 
 ### Roadmap
-
-#### v0.1.0
-- [ ] Add carbon emissions evaluation
-- [ ] Add Mean Reciprocal Rank (an information retrieval metric that considers how high in a ranked list the retriever can place the correct item)
 
 #### v1.0.0
 
@@ -171,13 +187,14 @@ Find a reference for all the functions and classes [here](https://github.com/Ast
 Contributions are always welcome!
 
 Find contribution guidelines at [CONTRIBUTING.md](https://github.com/AstraBert/SenTrEv/tree/main/CONTRIBUTING.md)
+
 ### License, Citation and Funding
 
 This project is open-source and is provided under an [MIT License](https://github.com/AstraBert/SenTrEv/tree/main/LICENSE).
 
 If you used `SenTrEv` to evaluate your retrieval models, please consider citing it:
 
-> _Bertelli, A. C. (2024). SenTrEv - Simple customizable evaluation for text retrieval performance of Sentence Transformers embedders on PDFs (v0.0.0). Zenodo. https://doi.org/10.5281/zenodo.14212650_
+> _Bertelli, A. C. (2024). Evaluation of the performance of three Sentence Transformers text embedders - a case study for SenTrEv (v0.1.0). Zenodo. https://doi.org/10.5281/zenodo.14503887_
 
 If you found it useful, please consider [funding it](https://github.com/sponsors/AstraBert) .
 
