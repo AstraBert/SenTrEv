@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sentrev"
-version = "0.1.0"
+version = "1.0.0"
 authors = [
-    { name="A. Clelia Bertelli", email="astraberte9@gmail.com" },
+    { name="Clelia (Astra) Bertelli", email="astraberte9@gmail.com" },
 ]
-description = "SenTrEv - Simple customizable evaluation for RAG performance of Sentence Transformers models on PDFs"
+description = "SenTrEv - Simple customizable evaluation for dense and sparse retrieval performance on your text documents"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -26,12 +26,14 @@ dependencies = [
     'langchain_text_splitters',
     'matplotlib',
     'codecarbon',
-    'pandas'
+    'pandas',
+    'fastembed',
+    'pdfitdown'
 ]
 
 [project.urls]
-Homepage = "https://github.com/AstraBert/sentrev"
-Issues = "https://github.com/AstraBert/sentrev/issues"
+Homepage = "https://github.com/AstraBert/SenTrEv"
+Issues = "https://github.com/AstraBert/SenTrEv/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

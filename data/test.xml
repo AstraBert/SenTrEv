@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Library>
+    <Book id="1">
+        <Title>The Whispering Woods</Title>
+        <Author>Sylvia Green</Author>
+        <Genre>Fantasy</Genre>
+        <PublicationYear>2015</PublicationYear>
+        <Available>true</Available>
+    </Book>
+    <Book id="2">
+        <Title>Shadows in the Fog</Title>
+        <Author>Marcus Reed</Author>
+        <Genre>Mystery</Genre>
+        <PublicationYear>2020</PublicationYear>
+        <Available>false</Available>
+    </Book>
+    <Book id="3">
+        <Title>The Eternal Sky</Title>
+        <Author>Amara Singh</Author>
+        <Genre>Science Fiction</Genre>
+        <PublicationYear>2018</PublicationYear>
+        <Available>true</Available>
+    </Book>
+    <Member id="101">
+        <Name>Anna Rivera</Name>
+        <MembershipDate>2022-05-15</MembershipDate>
+        <BooksBorrowed>
+            <BookID>2</BookID>
+        </BooksBorrowed>
+    </Member>
+    <Member id="102">
+        <Name>Johnathan Blake</Name>
+        <MembershipDate>2021-11-07</MembershipDate>
+        <BooksBorrowed>
+            <BookID>1</BookID>
+            <BookID>3</BookID>
+        </BooksBorrowed>
+    </Member>
+</Library>
