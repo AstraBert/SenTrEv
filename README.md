@@ -5,7 +5,11 @@
 <br>
 <div align="center">
     <img src="https://raw.githubusercontent.com/AstraBert/SenTrEv/main/logo.png" alt="SenTrEv Logo">
+    <br>
+    <br>
+    <a href="https://doi.org/10.5281/zenodo.14583071"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.14583071.svg" alt="DOI"></a>
 </div>
+<br>
 
 **SenTrEv** (**Sen**tence **Tr**ansformers **Ev**aluator) is a python package that is aimed at running simple evaluation tests to help you choose the best embedding model for Retrieval Augmented Generation (RAG) with your text-based documents.
 
@@ -51,7 +55,7 @@ SenTrEv applies a very simple evaluation workflow:
 
 See the figure below for a visualization of the workflow
 
-![workflow](https://raw.githubusercontent.com/AstraBert/SenTrEv/january-2025/workflow.png)
+![workflow](https://raw.githubusercontent.com/AstraBert/SenTrEv/main/workflow.png)
 
 The metrics used to evaluate performance were:
 
@@ -258,9 +262,13 @@ Contributions are always welcome!
 
 Find contribution guidelines at [CONTRIBUTING.md](https://github.com/AstraBert/SenTrEv/tree/main/CONTRIBUTING.md)
 
-### License and Funding
+### License, Citation and Funding
 
 This project is open-source and is provided under an [MIT License](https://github.com/AstraBert/SenTrEv/tree/main/LICENSE).
+
+If you used **SenTrEv**, please cite:
+
+_Bertelli, A. C. (2024). SenTrEv - Simple evaluation for dense and sparse retrieval on your documents (v1.0.0). Zenodo. https://doi.org/10.5281/zenodo.14583071_
 
 If you found it useful, please consider [funding it](https://github.com/sponsors/AstraBert) .
 
