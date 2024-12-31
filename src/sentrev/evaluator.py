@@ -10,6 +10,8 @@ from typing import List, Dict, Tuple
 from statistics import mean, stdev
 from codecarbon import OfflineEmissionsTracker
 
+
+
 plt.style.use("seaborn-v0_8-paper")
 
 def upload_pdfs(
@@ -47,7 +49,7 @@ def upload_pdfs(
     return data, collection_name
 
 
-def evaluate_rag(
+def evaluate_dense_retrieval(
     pdfs: List[str],
     encoders: List[SentenceTransformer],
     encoder_to_name: Dict[SentenceTransformer, str],

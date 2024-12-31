@@ -4,7 +4,25 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import models
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
+from fastembed import SparseTextEmbedding
+from pdfitdown.pdfconversion import convert_to_pdf, convert_markdown_to_pdf
 import os
+
+def get_sparse_embedding(text: str, model: SparseTextEmbedding):
+    embeddings = list(model.embed(text))
+    vector = {f"sparse-text": models.SparseVector(indices=embeddings[0].indices, values=embeddings[0].values)}
+    return vector
+
+def get_query_sparse_embedding(text: str, model: SparseTextEmbedding):
+    embeddings = list(model.embed(text))
+    query_vector = models.NamedSparseVector(
+        name="sparse-text",
+        vector=models.SparseVector(
+            indices=embeddings[0].indices,
+            values=embeddings[0].values,
+        ),
+    )
+    return query_vector
 
 
 def remove_items(test_list: list, item):
@@ -54,7 +72,7 @@ class NeuralSearcher:
         model (SentenceTransformer): Model for encoding text into vectors
     """
 
-    def __init__(self, collection_name, client, model):
+    def __init__(self, collection_name: str, client: QdrantClient, model: SentenceTransformer):
         self.collection_name = collection_name
         # Initialize encoder model
         self.model = model
@@ -75,6 +93,30 @@ class NeuralSearcher:
         """
         # Convert text query into vector
         vector = self.model.encode(text).tolist()
+
+        # Use `vector` for search for closest vectors in the collection
+        search_result = self.qdrant_client.search(
+            collection_name=self.collection_name,
+            query_vector=vector,
+            query_filter=None,  # If you don't want any filters for now
+            limit=limit,
+        )
+        payloads = [hit.payload for hit in search_result]
+        return payloads
+    def search_sparse(self, text: str, sparse_encoder: SparseTextEmbedding, limit: int = 1):
+        """
+        Perform a neural search for the given text query.
+
+        Args:
+            text (str): Search query text
+            limit (int, optional): Maximum number of results to return. Defaults to 1
+
+        Returns:
+            list: List of payload objects from the most similar documents found in the collection,
+                 where each payload contains the document text and metadata
+        """
+        # Convert text query into vector
+        vector = get_query_sparse_embedding(text, self.model)
 
         # Use `vector` for search for closest vectors in the collection
         search_result = self.qdrant_client.search(
@@ -191,4 +233,37 @@ class PDFdatabase:
                 for idx, doc in enumerate(self.documents)
             ],
         )
+        return self.collection_name
+
+    def qdrant_sparse_and_upload(self, sparse_encoder: SparseTextEmbedding):
+        """
+        Create a Qdrant collection and upload the processed documents.
+
+        Creates a new collection with the specified name and vector parameters,
+        then converts all documents to vectors and uploads them with their metadata.
+
+        Returns:
+            str: Name of the created Qdrant collection
+        """
+        self.client.recreate_collection(
+                collection_name=self.collection_name,
+                vectors_config={},
+                sparse_vectors_config={"sparse-text": models.SparseVectorParams(
+                    index=models.SparseIndexParams(
+                        on_disk=False
+                    )
+                )}
+        )
+        for idx, doc in enumerate(self.documents):
+            vector = get_sparse_embedding(doc["text"], sparse_encoder)
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=[
+                    models.SparsePointStruct(
+                        id=idx,
+                        vector=vector,
+                        payload=doc,
+                    )
+                ]
+            )
         return self.collection_name
