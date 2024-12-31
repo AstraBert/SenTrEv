@@ -4,7 +4,24 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import models
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
+from fastembed import SparseTextEmbedding
 import os
+
+def get_sparse_embedding(text: str, model: SparseTextEmbedding):
+    embeddings = list(model.embed(text))
+    vector = {f"sparse-text": models.SparseVector(indices=embeddings[0].indices, values=embeddings[0].values)}
+    return vector
+
+def get_query_sparse_embedding(text: str, model: SparseTextEmbedding):
+    embeddings = list(model.embed(text))
+    query_vector = models.NamedSparseVector(
+        name="sparse-text",
+        vector=models.SparseVector(
+            indices=embeddings[0].indices,
+            values=embeddings[0].values,
+        ),
+    )
+    return query_vector
 
 
 def remove_items(test_list: list, item):
@@ -36,9 +53,10 @@ def merge_pdfs(pdfs: list):
     merger = PdfMerger()
     for pdf in pdfs:
         merger.append(pdf)
-    merger.write(f"{pdfs[-1].split('.')[0]}_results.pdf")
+    finpath = pdfs[-1].replace("\\","/")
+    merger.write(f"{finpath.split('/')[-1].split('.')[0]}_results.pdf")
     merger.close()
-    return f"{pdfs[-1].split('.')[0]}_results.pdf"
+    return f"{finpath.split('/')[-1].split('.')[0]}_results.pdf"
 
 
 class NeuralSearcher:
@@ -51,10 +69,10 @@ class NeuralSearcher:
     Args:
         collection_name (str): Name of the Qdrant collection to search in
         client (QdrantClient): Initialized Qdrant client for database operations
-        model (SentenceTransformer): Model for encoding text into vectors
+        model (SentenceTransformer | None): Model for encoding text into vectors
     """
 
-    def __init__(self, collection_name, client, model):
+    def __init__(self, collection_name: str, client: QdrantClient, model: SentenceTransformer | None):
         self.collection_name = collection_name
         # Initialize encoder model
         self.model = model
@@ -63,7 +81,7 @@ class NeuralSearcher:
 
     def search(self, text: str, limit: int = 1):
         """
-        Perform a neural search for the given text query.
+        Perform a neural search for the given text query in a dense vector database.
 
         Args:
             text (str): Search query text
@@ -85,18 +103,42 @@ class NeuralSearcher:
         )
         payloads = [hit.payload for hit in search_result]
         return payloads
+    def search_sparse(self, text: str, sparse_encoder: SparseTextEmbedding, limit: int = 1):
+        """
+        Perform a neural search in a sparse vector database for the given text query.
+
+        Args:
+            text (str): Search query text
+            sparse_encoder (SparseTextEmbedding): FastEmbed-served SparseTextEmbedding encoder model
+            limit (int, optional): Maximum number of results to return. Defaults to 1
+
+        Returns:
+            list: List of payload objects from the most similar documents found in the collection,
+                 where each payload contains the document text and metadata
+        """
+        # Convert text query into vector
+        vector = get_query_sparse_embedding(text, sparse_encoder)
+
+        # Use `vector` for search for closest vectors in the collection
+        search_result = self.qdrant_client.search(
+            collection_name=self.collection_name,
+            query_vector=vector,
+            query_filter=None,  # If you don't want any filters for now
+            limit=limit,
+        )
+        payloads = [hit.payload for hit in search_result]
+        return payloads
 
 
 class PDFdatabase:
     """
-    A class for processing PDF documents and storing their contents in a Qdrant vector database.
+    A class for processing PDF documents and storing their contents in a Qdrant vector database (dense and sparse).
 
-    This class handles PDF merging, text extraction, chunking, and uploading to Qdrant
-    for vector similarity search.
+    This class handles PDF merging, text extraction, chunking, and uploading to Qdrant for vector similarity search.
 
     Args:
         pdfs (list): List of paths to PDF files to process
-        encoder (SentenceTransformer): Model for encoding text into vectors
+        encoder (SentenceTransformer | None): Model for encoding text into vectors
         client (QdrantClient): Initialized Qdrant client for database operations
         chunking_size (int, optional): Size of text chunks for processing. Defaults to 1000
         distance (str, optional): Distance metric for vector similarity. Must be one of: 'cosine', 'dot', 'euclid', 'manhattan'. Defaults to 'cosine'
@@ -105,7 +147,7 @@ class PDFdatabase:
     def __init__(
         self,
         pdfs: list,
-        encoder: SentenceTransformer,
+        encoder: SentenceTransformer | None,
         client: QdrantClient,
         chunking_size=1000,
         distance: str = "cosine",
@@ -165,10 +207,10 @@ class PDFdatabase:
 
     def qdrant_collection_and_upload(self):
         """
-        Create a Qdrant collection and upload the processed documents.
+        Create a **dense** Qdrant collection and upload the processed documents.
 
         Creates a new collection with the specified name and vector parameters,
-        then converts all documents to vectors and uploads them with their metadata.
+        then converts all documents to **dense** vectors and uploads them with their metadata.
 
         Returns:
             str: Name of the created Qdrant collection
@@ -191,4 +233,40 @@ class PDFdatabase:
                 for idx, doc in enumerate(self.documents)
             ],
         )
+        return self.collection_name
+
+    def qdrant_sparse_and_upload(self, sparse_encoder: SparseTextEmbedding):
+        """
+        Create a **sparse** Qdrant collection and upload the processed documents.
+
+        Creates a new collection with the specified name and vector parameters,
+        then converts all documents to **sparse** vectors and uploads them with their metadata.
+
+        Args:
+            sparse_encoder (SparseTextEmbedding): FastEmbed-served SparseTextEmbedding encoder model
+
+        Returns:
+            str: Name of the created Qdrant collection
+        """
+        self.client.recreate_collection(
+                collection_name=self.collection_name,
+                vectors_config={},
+                sparse_vectors_config={"sparse-text": models.SparseVectorParams(
+                    index=models.SparseIndexParams(
+                        on_disk=False
+                    )
+                )}
+        )
+        for idx, doc in enumerate(self.documents):
+            vector = get_sparse_embedding(doc["text"], sparse_encoder)
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=[
+                    models.PointStruct(
+                        id=idx,
+                        vector=vector,
+                        payload=doc,
+                    )
+                ]
+            )
         return self.collection_name

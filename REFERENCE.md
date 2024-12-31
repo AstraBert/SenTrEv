@@ -7,20 +7,45 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 import matplotlib.pyplot as plt
 import pandas as pd
-import random as r
+import random
 import time
 from math import floor
 from typing import List, Dict, Tuple
 from statistics import mean, stdev
 from codecarbon import OfflineEmissionsTracker
+from pdfitdown.pdfconversion import convert_to_pdf, convert_markdown_to_pdf
+import warnings
 
 plt.style.use("seaborn-v0_8-paper")
+```
+
+## `to_pdf` Function
+
+### Description
+Converts various file formats to PDF, supporting formats like `.docx`, `.pdf`, `.html`, `.pptx`, `.csv`, `.xml`, and `.md`. Unsupported formats trigger a warning.
+
+### Parameters
+- `files (List[str])`: List of file paths to convert.
+
+### Returns
+- `List[str]`: Paths to converted PDF files. For files already in PDF format, returns the original path.
+
+### Raises
+- `FileNotConvertedWarning`: Raised when a file format is not supported for conversion.
+
+### Code
+```python
+def to_pdf(files: List[str]) -> List[str]:
+    pdfs = []
+    for f in files:
+        # Conversion logic for supported file formats
+    return pdfs
 ```
 
 ## `upload_pdfs` Function
 
 ### Description
-Processes and uploads multiple PDF documents to a Qdrant vector database. This function handles the entire workflow, including merging, preprocessing, chunking, encoding, and uploading to the Qdrant database.
+Processes and uploads multiple PDF documents to a dense Qdrant vector database.
 
 ### Parameters
 - `pdfs (List[str])`: List of file paths to the PDF documents to process.
@@ -29,71 +54,89 @@ Processes and uploads multiple PDF documents to a Qdrant vector database. This f
 - `chunking_size (int, optional)`: Size of text chunks for processing. Default is 1000.
 - `distance (str, optional)`: Distance metric for vector similarity. Options: `"cosine"`, `"dot"`, `"euclid"`, `"manhattan"`. Default is `"cosine"`.
 
+### Returns
+- `Tuple[list, str]`: A tuple containing:
+  - `list`: Processed document data.
+  - `str`: Name of the created Qdrant collection.
+
+## `upload_pdfs_sparse` Function
+
+### Description
+Processes and uploads multiple PDF documents to a sparse Qdrant vector database.
+
+### Parameters
+- `pdfs (List[str])`: List of file paths to the PDF documents to process.
+- `sparse_encoder (SparseTextEmbedding)`: Sparse text encoder served with FastEmbed.
+- `client (QdrantClient)`: Initialized Qdrant client for database operations.
+- `chunking_size (int, optional)`: Size of text chunks for processing. Default is 1000.
+- `distance (str, optional)`: Distance metric for vector similarity. Options: `"cosine"`, `"dot"`, `"euclid"`, `"manhattan"`. Default is `"cosine"`.
 
 ### Returns
 - `Tuple[list, str]`: A tuple containing:
-  - `list`: Processed document data (dictionaries containing `text`, `source`, and `page`).
-  - `str`: Name of the created Qdrant collection.
+  - `list`: Processed document data.
+  - `str`: Name of the created Qdrant collection.
 
-### Code
-```python
-def upload_pdfs(
-    pdfs: List[str],
-    encoder: SentenceTransformer,
-    client: QdrantClient,
-    chunking_size: int = 1000,
-) -> Tuple[list, str]:
-    pdfdb = PDFdatabase(pdfs, encoder, client, chunking_size)
-    pdfdb.preprocess()
-    data = pdfdb.collect_data()
-    collection_name = pdfdb.qdrant_collection_and_upload()
-    return data, collection_name
-```
-
-## `evaluate_rag` Function
+## `evaluate_dense_retrieval` Function
 
 ### Description
-Evaluates Retrieval-Augmented Generation (RAG) performance using sentence encoders. Uploads PDFs to a Qdrant database, conducts retrieval tests, and computes comprehensive performance metrics. Supports optional Mean Reciprocal Rank (MRR) evaluation and carbon emissions tracking.
+Evaluates dense retrieval performance using SentenceTransformers models.
 
 ### Parameters
-- `pdfs (List[str])`: PDF document paths to process.
+- `files (List[str])`: List of document paths to process.
 - `encoders (List[SentenceTransformer])`: Sentence transformer models for text encoding.
 - `encoder_to_name (Dict[SentenceTransformer, str])`: Mapping of encoder models to display names.
-- `client (QdrantClient)`: Qdrant client for database interactions.
+- `client (QdrantClient)`: Qdrant vector database client.
 - `csv_path (str)`: Path to save performance metrics CSV.
-- `chunking_size (int, optional)`: Characters per PDF text chunk. Default is 1000.
-- `text_percentage (float, optional)`: Text chunk fraction for retrieval. Default is 0.25.
-- `distance (str, optional)`: Vector similarity metric. Options: `"cosine"`, `"dot"`, `"euclid"`, `"manhattan"`. Default is `"cosine"`.
+- `chunking_size (int, optional)`: Size of text chunks for processing. Default is 1000.
+- `text_percentage (float, optional)`: Fraction of text chunk used for retrieval. Default is 0.25.
+- `distance (str, optional)`: Distance metric for vector similarity. Default is `"cosine"`.
 - `mrr (int, optional)`: Mean Reciprocal Rank evaluation depth. Default is 1.
 - `carbon_tracking (str, optional)`: ISO country code for carbon emissions tracking.
-- `plot (bool, optional)`: Generate performance visualization plots. Default is `False`.
-
-### Returns
-None.
-
-### Side Effects
-- Uploads data to Qdrant database.
-- Deletes Qdrant collections after evaluation.
-- Saves performance metrics to CSV.
-- Optionally generates visualization plots.
+- `plot (bool, optional)`: Whether to generate visualization plots. Default is `False`.
 
 ### Metrics
 - Average Retrieval Time
 - Retrieval Time Standard Deviation
 - Success Rate
 - Mean Reciprocal Rank (optional)
+- Precision
+- Non-relevant Ratio
 - Carbon Emissions (optional)
 
-### Visualization
-Generates bar plots for:
-1. Average Retrieval Time
-2. Retrieval Success Rate
-3. Mean Reciprocal Rank (if enabled)
-4. Carbon Emissions (if tracking enabled)
+### Returns
+None.
 
-### Code
-See [the evaluator.py script](./src/sentrev/evaluator.py)
+## `evaluate_sparse_retrieval` Function
 
+### Description
+Evaluates sparse retrieval performance using FastEmbed-served SparseTextEmbedding models.
+
+### Parameters
+- `files (List[str])`: List of document paths to process.
+- `encoders (List[SparseTextEmbedding])`: SparseTextEmbedding models for text encoding.
+- `encoder_to_name (Dict[SparseTextEmbedding, str])`: Mapping of encoder models to display names.
+- `client (QdrantClient)`: Qdrant vector database client.
+- `csv_path (str)`: Path to save performance metrics CSV.
+- `chunking_size (int, optional)`: Size of text chunks for processing. Default is 1000.
+- `text_percentage (float, optional)`: Fraction of text chunk used for retrieval. Default is 0.25.
+- `distance (str, optional)`: Distance metric for vector similarity. Default is `"cosine"`.
+- `mrr (int, optional)`: Mean Reciprocal Rank evaluation depth. Default is 1.
+- `carbon_tracking (str, optional)`: ISO country code for carbon emissions tracking.
+- `plot (bool, optional)`: Whether to generate visualization plots. Default is `False`.
+
+### Metrics
+- Average Retrieval Time
+- Retrieval Time Standard Deviation
+- Success Rate
+- Mean Reciprocal Rank (optional)
+- Precision
+- Non-relevant Ratio
+- Carbon Emissions (optional)
+
+### Returns
+None.
+
+---
 
 # sentrev.utils
 
@@ -106,6 +149,7 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import models
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
+from fastembed import SparseTextEmbedding
 import os
 ```
 
@@ -117,8 +161,8 @@ import os
 Removes all occurrences of a specific item from a list.
 
 #### Parameters
-- `test_list (list)`: The input list to process.
-- `item`: The element to remove from the list.
+- `test_list (list)`: Input list to process.
+- `item`: Element to remove from the list.
 
 #### Returns
 - `list`: A new list with all occurrences of the specified item removed.
@@ -139,7 +183,7 @@ Merges multiple PDF files into a single PDF document.
 - `pdfs (list)`: List of paths to PDF files to merge.
 
 #### Returns
-- `str`: Path to the merged PDF file. The filename is derived from the last PDF in the input list with `_results` appended before the extension.
+- `str`: Path to the merged PDF file.
 
 #### Code
 ```python
@@ -157,126 +201,58 @@ def merge_pdfs(pdfs: list):
 ### `NeuralSearcher`
 
 #### Description
-Performs neural search operations on embedded documents using Qdrant. Converts text queries into vectors and retrieves the most similar vectors from a Qdrant collection.
+Performs neural search operations on embedded documents using Qdrant. Supports both dense and sparse searches.
 
 #### Parameters
 - `collection_name (str)`: Name of the Qdrant collection to search in.
 - `client (QdrantClient)`: Initialized Qdrant client for database operations.
-- `model (SentenceTransformer)`: Model for encoding text into vectors.
+- `model (SentenceTransformer | None)`: Model for encoding text into dense vectors.
 
 #### Methods
-- `search`:
-    - **Description**: Performs a neural search for the given text query.
+
+- **`search`**:
+    - **Description**: Performs a dense neural search for the given text query.
     - **Parameters**:
         - `text (str)`: Search query text.
         - `limit (int, optional)`: Maximum number of results to return. Default is 1.
-    - **Returns**: `list`: List of payload objects from the most similar documents found in the collection.
+    - **Returns**: `list`: List of payloads from the most similar documents found in the collection.
 
-#### Code
-```python
-class NeuralSearcher:
-    def __init__(self, collection_name, client, model):
-        self.collection_name = collection_name
-        self.model = model
-        self.qdrant_client = client
-
-    def search(self, text: str, limit: int = 1):
-        vector = self.model.encode(text).tolist()
-        search_result = self.qdrant_client.search(
-            collection_name=self.collection_name,
-            query_vector=vector,
-            query_filter=None,
-            limit=limit,
-        )
-        payloads = [hit.payload for hit in search_result]
-        return payloads
-```
+- **`search_sparse`**:
+    - **Description**: Performs a sparse neural search for the given text query.
+    - **Parameters**:
+        - `text (str)`: Search query text.
+        - `sparse_encoder (SparseTextEmbedding)`: Sparse text encoder model.
+        - `limit (int, optional)`: Maximum number of results to return. Default is 1.
+    - **Returns**: `list`: List of payloads from the most similar documents found in the collection.
 
 ### `PDFdatabase`
 
 #### Description
-Processes PDF documents and stores their contents in a Qdrant vector database for neural search. Handles PDF merging, text extraction, chunking, and uploading to Qdrant.
+Processes PDF documents and stores their contents in a Qdrant vector database. Supports both dense and sparse vectors.
 
 #### Parameters
 - `pdfs (list)`: List of paths to PDF files to process.
-- `encoder (SentenceTransformer)`: Model for encoding text into vectors.
+- `encoder (SentenceTransformer | None)`: Model for encoding text into dense vectors.
 - `client (QdrantClient)`: Initialized Qdrant client for database operations.
 - `chunking_size (int, optional)`: Size of text chunks for processing. Default is 1000.
-- `distance (str, optional)`: Distance metric for vector similarity. Options: `"cosine"`, `"dot"`, `"euclid"`, `"manhattan"`. Default is `"cosine"`.
+- `distance (str, optional)`: Distance metric for vector similarity. Default is `"cosine"`.
 
 #### Methods
 
 - **`preprocess`**:
     - **Description**: Preprocesses the merged PDF document by loading and splitting it into chunks.
-    - **Details**: Uses LangChain's `PyPDFLoader` and `CharacterTextSplitter` for text extraction and splitting.
 
 - **`collect_data`**:
     - **Description**: Processes chunked documents into structured format.
     - **Returns**: `list`: List of dictionaries containing processed document information (`text`, `source`, `page`).
 
 - **`qdrant_collection_and_upload`**:
-    - **Description**: Creates a Qdrant collection and uploads processed documents as vectors with metadata.
+    - **Description**: Creates a Qdrant collection and uploads processed documents as dense vectors with metadata.
     - **Returns**: `str`: Name of the created Qdrant collection.
 
-#### Code
-```python
-class PDFdatabase:
-    def __init__(self, pdfs: list, encoder: SentenceTransformer, client: QdrantClient, chunking_size=1000, distance: str ='cosine'):
-        distance_dict = {
-            "cosine": models.Distance.COSINE,
-            "dot": models.Distance.DOT,
-            "euclid": models.Distance.EUCLID,
-            "manhattan": models.Distance.MANHATTAN
-        }
-        self.finalpdf = merge_pdfs(pdfs)
-        self.collection_name = os.path.basename(self.finalpdf).split(".")[0].lower()
-        self.encoder = encoder
-        self.client = client
-        self.chunking_size = chunking_size
-        self.distance = distance_dict[distance]
-
-    def preprocess(self):
-        loader = PyPDFLoader(self.finalpdf)
-        documents = loader.load()
-        text_splitter = CharacterTextSplitter(
-            chunk_size=self.chunking_size, chunk_overlap=0
-        )
-        self.pages = text_splitter.split_documents(documents)
-
-    def collect_data(self):
-        self.documents = []
-        for text in self.pages:
-            contents = text.page_content.split("\n")
-            contents = remove_items(contents, "")
-            for content in contents:
-                self.documents.append(
-                    {
-                        "text": content,
-                        "source": text.metadata["source"],
-                        "page": str(text.metadata["page"]),
-                    }
-                )
-        return self.documents
-
-    def qdrant_collection_and_upload(self):
-        self.client.recreate_collection(
-            collection_name=self.collection_name,
-            vectors_config=models.VectorParams(
-                size=self.encoder.get_sentence_embedding_dimension(),
-                distance=self.distance,
-            ),
-        )
-        self.client.upload_points(
-            collection_name=self.collection_name,
-            points=[
-                models.PointStruct(
-                    id=idx,
-                    vector=self.encoder.encode(doc["text"]).tolist(),
-                    payload=doc,
-                )
-                for idx, doc in enumerate(self.documents)
-            ],
-        )
-        return self.collection_name
-```
+- **`qdrant_sparse_and_upload`**:
+    - **Description**: Creates a sparse Qdrant collection and uploads processed documents as sparse vectors with metadata.
+    - **Parameters**:
+        - `sparse_encoder (SparseTextEmbedding)`: Sparse text encoder model.
+    - **Returns**: `str`: Name of the created Qdrant collection.
 
