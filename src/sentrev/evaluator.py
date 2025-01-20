@@ -383,13 +383,15 @@ def evaluate_dense_retrieval(
             client.delete_collection(collection_name)
     performances_df = pd.DataFrame.from_dict(performances)
     performances_df.to_csv(csv_path, index=False)
+    csv_name = os.path.basename(csv_path)
+    csv_path_base = os.path.dirname(csv_path)
     if plot:
-        path_time = csv_path.split(".")[0] + "_times.png"
-        path_sr = csv_path.split(".")[0] + "_success_rate.png"
-        path_mrr = csv_path.split(".")[0] + "_mrr.png"
-        path_co2 = csv_path.split(".")[0] + "_co2.png"
-        path_precision = csv_path.split(".")[0] + "_precision.png"
-        path_nonrelevant = csv_path.split(".")[0] + "_nonrelevant.png"
+        path_time = csv_path_base + "/" + csv_name.split(".")[0] + "_times.png"
+        path_sr = csv_path_base + "/" + csv_name.split(".")[0] + "_success_rate.png"
+        path_mrr = csv_path_base + "/" + csv_name.split(".")[0] + "_mrr.png"
+        path_co2 = csv_path_base + "/" + csv_name.split(".")[0] + "_co2.png"
+        path_precision = csv_path_base + "/" + csv_name.split(".")[0] + "_precision.png"
+        path_nonrelevant = csv_path_base + "/" + csv_name.split(".")[0] + "_nonrelevant.png"
         X = performances["encoder"]
         y_times = performances["average_time"]
         yerr_times = performances["stdev_time"]
@@ -747,13 +749,15 @@ def evaluate_sparse_retrieval(
             client.delete_collection(collection_name)
     performances_df = pd.DataFrame.from_dict(performances)
     performances_df.to_csv(csv_path, index=False)
+    csv_name = os.path.basename(csv_path)
+    csv_path_base = os.path.dirname(csv_path)
     if plot:
-        path_time = csv_path.split(".")[0] + "_times.png"
-        path_sr = csv_path.split(".")[0] + "_success_rate.png"
-        path_mrr = csv_path.split(".")[0] + "_mrr.png"
-        path_co2 = csv_path.split(".")[0] + "_co2.png"
-        path_precision = csv_path.split(".")[0] + "_precision.png"
-        path_nonrelevant = csv_path.split(".")[0] + "_nonrelevant.png"
+        path_time = csv_path_base + "/" + csv_name.split(".")[0] + "_times.png"
+        path_sr = csv_path_base + "/" + csv_name.split(".")[0] + "_success_rate.png"
+        path_mrr = csv_path_base + "/" + csv_name.split(".")[0] + "_mrr.png"
+        path_co2 = csv_path_base + "/" + csv_name.split(".")[0] + "_co2.png"
+        path_precision = csv_path_base + "/" + csv_name.split(".")[0] + "_precision.png"
+        path_nonrelevant = csv_path_base + "/" + csv_name.split(".")[0] + "_nonrelevant.png"
         X = performances["encoder"]
         y_times = performances["average_time"]
         yerr_times = performances["stdev_time"]
