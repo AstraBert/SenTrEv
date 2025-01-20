@@ -195,14 +195,14 @@ class PDFdatabase:
         for text in self.pages:
             contents = text.page_content.split("\n")
             contents = remove_items(contents, "")
-            for content in contents:
-                self.documents.append(
-                    {
-                        "text": content,
-                        "source": text.metadata["source"],
-                        "page": str(text.metadata["page"]),
-                    }
-                )
+            content = "\n".join(contents)
+            self.documents.append(
+                {
+                    "text": content,
+                    "source": text.metadata["source"],
+                    "page": str(text.metadata["page"]),
+                }
+            )
         return self.documents
 
     def qdrant_collection_and_upload(self):
